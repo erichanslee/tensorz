@@ -31,6 +31,20 @@ function dynsys_tensor_eigenvector(T; xinit=Void, f=x -> abs.(x), k=1, h=0.5, hi
     end
     normalize!(x)
 
+    function jacobian(f,x)
+        m=length(x);
+        J = zeros(m,m);
+        fx=f(x);
+        eps=1.e-6;
+        xperturb=x;
+        for i=1:m
+           xperturb[i]=xperturb[i]+eps;
+           J[:,i]=(f(xperturb)-fx)/eps;
+           xperturb[i]=x[i];
+        end
+    return J;
+    end
+
     # This is the ODE function
     F = function(x::Vector{Float64})
         M = mult3(T, x)
@@ -49,6 +63,11 @@ function dynsys_tensor_eigenvector(T; xinit=Void, f=x -> abs.(x), k=1, h=0.5, hi
         return real(v) - x
     end
 
+    J = jacobian(F,x)
+    D,V = eig(J)
+    println("Starting Jacobian Eigenvalues:")
+    println(D)
+
     # Forward Euler method
     for iter=1:100
         x = x + h*F(x)
@@ -57,6 +76,12 @@ function dynsys_tensor_eigenvector(T; xinit=Void, f=x -> abs.(x), k=1, h=0.5, hi
             push!(histlam, quot[1])
         end
     end
+
+    J = jacobian(F,x)
+    D,V = eig(J)
+    println("Ending Jacobian Eigenvalues:")
+    println(D)
+
     return x, x'*mult3(T,x)*x
 end
 
@@ -107,24 +132,23 @@ function main()
     T = example_tensor()
     srand(1) # for consistent results
     ntrials = 5
-    display(countmap(map(x -> round(x, 4), results(T, x -> -abs.(x), ntrials))))
-    display(countmap(map(x -> round(x, 4), results(T, x -> abs.(x), ntrials))))
-    display(countmap(map(x -> round(x, 4), results(T, x -> x, ntrials))))
-    display(countmap(map(x -> round(x, 4), results(T, x -> -x, ntrials))))
-    display(countmap(map(x -> round(x, 4), results(T, x -> x, ntrials; k=2))))
+    # display(countmap(map(x -> round(x, 4), results(T, x -> -abs.(x), ntrials))))
+    # display(countmap(map(x -> round(x, 4), results(T, x -> abs.(x), ntrials))))
+    # display(countmap(map(x -> round(x, 4), results(T, x -> x, ntrials))))
+    # display(countmap(map(x -> round(x, 4), results(T, x -> -x, ntrials))))
+    # display(countmap(map(x -> round(x, 4), results(T, x -> x, ntrials; k=2))))
 
     # make plot
     histlam = zeros(0)
     srand(1)
     x, val = dynsys_tensor_eigenvector(T; f = x -> x, k=2, histlam=histlam)
-
+    println("")
+    println(val)
     PyPlot.pygui(true)
     plot(1:30, histlam[1:30])
     xlabel("Iteration")
     ylabel("Rayleigh quotient")
-    title("lambda = 0.2294")
     show()
-    savefig("convergence.eps")
 end
 
 main()

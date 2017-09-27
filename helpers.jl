@@ -1,6 +1,16 @@
 using Combinatorics
 using StatsBase
 
+function symtensor(T::Array{Float64})
+    S = zeros(T)
+    d = ndims(T)
+    for p in permutations(1:d)
+        S += permutedims(T,p)
+    end
+    S
+end
+
+
 function example_tensor()
     T = zeros(3,3,3)
     T[1,2,3] = -0.1790
@@ -21,6 +31,16 @@ function example_tensor()
     return T
 end
 
+function rand_tensor(n)
+    A = rand(n,n,n)
+    
+    # Make Tensor "Diagonally Dominant"
+    for i = 1:n
+        A[i,i,i] += n
+    end
+    return A
+end
+
 function symtensor(T::Array{Float64})
     S = zeros(T)
     d = ndims(T)
@@ -30,28 +50,19 @@ function symtensor(T::Array{Float64})
     S
 end
 
-function unfold(A, i)
-    # dims not unfolded
-    N = length(size(A));
-    j = setdiff(1:N,i) ;
-
-    # Permute dims of A, bring unfolded dimension to front
-    B = permutedims(A,vcat(i,j))
-
-    # size of unfolded dimension
-    n = size(B,1)
-    
-    return reshape(B,(n,div(length(B),n)))
-end
-
-A = rand(3,3,3)
-
-function funcM(x)
-    dims = size(A)
+function mult3(T::Array{Float64,3}, x::Vector{Float64})
+    dims = size(T)
     M = zeros(dims[1],dims[2])
     for i=1:dims[3]
-        M += A[:,:,i]*x[i]
+        M += T[:,:,i]*x[i]
     end
+    return M
+end
+
+
+function funcM(x)
+    A = example_tensor()
+    M = mult3(A, x)
     d,V = eig(M)
     # filter to the real ones
     realf = abs.(imag(d)) .<= size(M,1)*eps(Float64)
@@ -59,7 +70,7 @@ function funcM(x)
     V = V[:,realf]
     # now apply the filter function f and sort
     p = sortperm(abs.(d))
-    v = V[:,p[1]] # pick out the first eigenvector
+    v = V[:,p[1]] # pick out the kth eigenvector
     # normalize the sign
     if real(v[1]) >= 0
         v *= -1.0
@@ -70,6 +81,11 @@ end
 
 function M(t,x)
     return funcM(x)
+end
+
+function rayleigh(A, x)
+    M = mult3(A, x)
+    return x'*M*x
 end
 
 function jacobian(f,x)
